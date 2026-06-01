@@ -129,3 +129,21 @@ Stopped both application servers and observed:
 - Add monitoring with CloudWatch
 - Introduce Infrastructure as Code (Terraform)
 
+## Infrastructure as Code
+
+After manually building and testing the architecture, I recreated the core infrastructure using Terraform.
+
+Terraform manages:
+
+- VPC
+- Public and private subnets
+- Internet Gateway
+- NAT Gateway
+- Route tables
+- Security groups
+- Application Load Balancer
+- Target group
+- Launch template
+- Auto Scaling Group
+
+This demonstrates the ability to define repeatable cloud infrastructure as code rather than relying only on manual AWS Console configuration.
