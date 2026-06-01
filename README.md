@@ -129,6 +129,8 @@ Stopped both application servers and observed:
 - Add monitoring with CloudWatch
 - Introduce Infrastructure as Code (Terraform)
 
+---
+
 ## Infrastructure as Code
 
 After manually building and testing the architecture, I recreated the core infrastructure using Terraform.
