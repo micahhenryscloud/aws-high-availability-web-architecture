@@ -1,4 +1,11 @@
 terraform {
+  backend "s3" {
+    bucket = "micah-terraform-state-816625019234-816625019234-eu-west-2-an"
+    key    = "high-availability-web-architecture/terraform.tfstate"
+    region = "eu-west-2"
+    dynamodb_table = "terraform-state-locks"
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -61,6 +68,79 @@ resource "aws_subnet" "private_b" {
   tags = {
     Name = "terraform-private-subnet-b"
   }
+}
+
+resource "aws_subnet" "db_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.5.0/24"
+  availability_zone = "eu-west-2a"
+
+  tags = {
+    Name = "terraform-db-subnet-a"
+  }
+}
+
+resource "aws_subnet" "db_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.6.0/24"
+  availability_zone = "eu-west-2b"
+
+  tags = {
+    Name = "terraform-db-subnet-b"
+  }
+}
+
+resource "aws_db_subnet_group" "main" {
+  name = "terraform-db-subnet-group"
+
+  subnet_ids = [
+    aws_subnet.db_a.id,
+    aws_subnet.db_b.id
+  ]
+
+  tags = {
+    Name = "terraform-db-subnet-group"
+  }
+}
+
+resource "aws_security_group" "db_sg" {
+  name        = "terraform-db-sg"
+  description = "Allow MySQL from application servers"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_db_instance" "mysql" {
+  identifier             = "terraform-mysql-db"
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = "db.t3.micro"
+  allocated_storage      = 20
+  storage_type           = "gp2"
+
+  db_name                = "projectdb"
+  username               = "admin"
+  password               = "ChangeThisPassword123!"
+
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+
+  publicly_accessible    = false
+  multi_az               = true
+  skip_final_snapshot    = true
 }
 
 resource "aws_internet_gateway" "main" {
@@ -235,11 +315,42 @@ resource "aws_lb_listener" "http" {
   }
 }
 
+resource "aws_iam_role" "ec2_ssm_role" {
+  name = "terraform-ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "terraform-ec2-instance-profile"
+  role = aws_iam_role.ec2_ssm_role.name
+}
+
 resource "aws_launch_template" "app" {
   name_prefix   = "terraform-app-template-"
   image_id      = "ami-0a94c8e4ca2674d5a"
   instance_type = var.instance_type
   key_name = var.key_pair_name
+
+    iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
 
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
