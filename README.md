@@ -149,3 +149,22 @@ Terraform manages:
 - Auto Scaling Group
 
 This demonstrates the ability to define repeatable cloud infrastructure as code rather than relying only on manual AWS Console configuration.
+
+---
+
+## RDS Database Layer
+
+The architecture was extended into a full three-tier design by adding Amazon RDS MySQL in private database subnets.
+
+The database layer includes:
+
+- Two private database subnets across separate Availability Zones
+- DB subnet group
+- RDS MySQL instance
+- Multi-AZ enabled for resilience
+- Database security group allowing MySQL access only from the application server security group
+- Public accessibility disabled
+
+This completes the three-tier architecture:
+
+Internet → ALB → Auto Scaling EC2 App Servers → RDS MySQL
